@@ -18,6 +18,7 @@ if str(PROJECT_ROOT) not in sys.path:
 import pandas as pd
 import streamlit as st
 
+from src.audit_log import initialize_audit_log, log_event
 from src.data_cleaning import clean_ecommerce_data, validate_schema
 from src.data_loader import generate_synthetic_ecommerce_data, load_dataset_from_source
 from src.local_llm import check_ollama_status
@@ -96,6 +97,9 @@ def initialize_session_state():
         st.session_state.is_sample = True
     if "messages" not in st.session_state:
         st.session_state.messages = []
+    if "session_start" not in st.session_state:
+        st.session_state.session_start = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    initialize_audit_log()
 
 
 initialize_session_state()
@@ -106,14 +110,17 @@ def load_default_data():
     sample_path = PROJECT_ROOT / "data" / "sample_ecommerce.csv"
     if sample_path.exists():
         raw = load_dataset_from_source(sample_path)
+        log_event("DATA_LOAD", f"Loaded dataset from file: {sample_path.name} ({len(raw):,} rows)")
     else:
         raw = generate_synthetic_ecommerce_data(num_records=2500, random_seed=42)
+        log_event("DATA_LOAD", "Generated synthetic benchmark dataset (2,500 records, seed=42)")
     cleaned, summary = clean_ecommerce_data(raw)
     st.session_state.raw_df = raw
     st.session_state.cleaned_df = cleaned
     st.session_state.cleaning_summary = summary
     st.session_state.dataset_name = "Sample UCI Online Retail (Benchmark)"
     st.session_state.is_sample = True
+    log_event("DATA_CLEAN", f"Data cleaning complete: {len(cleaned):,} valid rows retained from {len(raw):,} raw rows")
 
 
 # Automatically load sample dataset on initial load
